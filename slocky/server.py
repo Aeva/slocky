@@ -173,18 +173,6 @@ class SlockyServer(object):
                    and re.match(r"[a-z]+", word):
                     magic_words.append(word)
 
-        self.__pending_devices.append(tuple(magic_words))
-        return magic_words
-
-
-def test_server():
-    srv = SlockyServer('localhost', 14900, ".")
-    while True:
-        srv.process_events()
-
-
-def test_client():
-    s = socket.socket()
-    ssl_sock = ssl.wrap_socket(s, ca_certs="certfile", cert_reqs=ssl.CERT_REQUIRED)
-    ssl_sock.connect(('localhost', 14900))
-    ssl_sock.write("I'm a hedgehog!\n")
+        device_code = " ".join(magic_words)
+        self.__pending_devices.append(device_code)
+        return device_code
