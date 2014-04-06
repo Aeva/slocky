@@ -71,3 +71,16 @@ def test_msg_pass():
 
     assert results["recieved"]
     assert results["data"][0] == test_phrase
+
+
+def test_new_device_phrase_gen():
+    """
+    Tests the add new device function to be sure it gives different
+    results each time for the pass pharse.
+    """
+
+    server_dir = tempfile.mkdtemp()
+    srv = SlockyServer('localhost', TEST_PORT, server_dir)
+    key_a = srv.add_new_device()
+    key_b = srv.add_new_device()
+    assert key_a != key_b

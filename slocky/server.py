@@ -21,6 +21,7 @@ from os.path import join as joinpath
 from os.path import abspath
 
 from slocky.packet import encode, decode
+from slocky.words import BASIC_ENGLISH
 
 # for reference: https://docs.python.org/2/library/ssl.html
 
@@ -178,17 +179,9 @@ class SlockyServer(object):
         """
 
         magic_words = []
-        with open("/usr/share/dict/words") as dump:
-            words = dump.readlines()
-            random.shuffle(words)
-            i = 0
-            while len(magic_words) < 4:
-                word = words[i].strip()
-                i += 1
-                if len(word) >= 4 and len(word) < 8 \
-                   and word == word.lower() and not word.endswith("s")\
-                   and re.match(r"[a-z]+", word):
-                    magic_words.append(word)
+        words = [i for i in BASIC_ENGLISH if len(i) >=4]
+        random.shuffle(words)
+        magic_words = words[:4]
 
         device_code = " ".join(magic_words)
         self.__pending_devices.append(device_code)
