@@ -15,7 +15,7 @@
 # along with Slocky.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import socket, select, ssl, uuid, os, tempfile
+import socket, select, ssl, uuid, os, tempfile, random, re, weakref
 from subprocess import Popen, PIPE
 from os.path import join as joinpath
 from os.path import abspath
@@ -27,19 +27,24 @@ class ClientConnection(object):
     """
     Used by SlockyServer to represent a client connection.
     """
-    def __init__(self, ssl_socket, address):
+    def __init__(self, server, ssl_socket, address):
         self.addr = address
         self.sock = ssl_socket
         self.pending = ""
+        self.__server = weakref.ref(server)
 
     def cycle(self):
         """
         Read new data from the client, and do any processing if
         necessary.
         """
-        self.pending += self.sock.read()
-        #fixme process off offsets etc
+
+        new_data = self.sock.read()
+        if new_data:
+            self.pending += new_data
+            print "New data from {0}: {1}".format(self.addr, new_data)
         
+
 
 
 class SlockyServer(object):
@@ -106,18 +111,18 @@ class SlockyServer(object):
         self.__s.setblocking(0)
         self.__sockets = []
         self.__clients = []
+        self.__pending_devices = []
 
     def __connect_client(self, socket, address):
 
-        connect = ssl.wrap_socket(
+        ssl_wrapper = ssl.wrap_socket(
             socket, server_side=True,
             certfile = self.__certfile,
             keyfile = self.__keyfile,
             ssl_version = ssl.PROTOCOL_TLSv1)
-        client = ClientConnection(connection, addr)
-        self.__sockets.append(socket)
+        client = ClientConnection(ssl_wrapper, address)
         self.__clients.append(client)
-
+        return client
 
     def process_events(self):
         """
@@ -125,23 +130,22 @@ class SlockyServer(object):
         """
 
         # readable, writeable, errored
-        read_list = [self.__s] + self.__sockets
-        # select.select used to determine which sockets actually have
-        # readable data on them.  This is used to avoid making
-        # non-blocking calls.
+        read_list = [self.__s]
+        # use select to make listening for new connections to be
+        # non-blocking
         for s in select.select(read_list, [], [], 0)[0]:
             if s is self.__s:
                 # make note of any incoming connections
-                self.__connect_client(*self.__s.accept())
+                args = [self] + self.__s.accept()
+                client = self.__connect_client(*args)
                 print "Connected from {0}".format(client.addr)
-            else:
-                # process data from client connection
-                client = self.__clients[self.__sockets.index(s)]
-                client.cycle()
-                print "New data from {0}: {1}".format(
-                    client.addr, client.pending)
-        
 
+        # client.sock.read() is non-blocking, so we don't need to do
+        # anything fancy to see if there is new data or not in a
+        # timely fashion.
+        for client in self.__clients:
+            client.cycle()
+        
     def on_message(self, msg_object):
         """
         Duckpunch me lol.
@@ -150,6 +154,27 @@ class SlockyServer(object):
     
     def send_message(self, msg_object, target=None):
         pass
+
+    def add_new_device(self):
+        """
+        Generate a pass phrase for passing the cert to a new client.
+        """
+
+        magic_words = []
+        with open("/usr/share/dict/words") as dump:
+            words = dump.readlines()
+            random.shuffle(words)
+            i = 0
+            while len(magic_words) < 4:
+                word = words[i].strip()
+                i += 1
+                if len(word) >= 4 and len(word) < 8 \
+                   and word == word.lower() and not word.endswith("s")\
+                   and re.match(r"[a-z]+", word):
+                    magic_words.append(word)
+
+        self.__pending_devices.append(tuple(magic_words))
+        return magic_words
 
 
 def test_server():
@@ -162,3 +187,4 @@ def test_client():
     s = socket.socket()
     ssl_sock = ssl.wrap_socket(s, ca_certs="certfile", cert_reqs=ssl.CERT_REQUIRED)
     ssl_sock.connect(('localhost', 14900))
+    ssl_sock.write("I'm a hedgehog!\n")
