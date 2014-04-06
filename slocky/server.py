@@ -15,7 +15,8 @@
 # along with Slocky.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import socket, select, ssl, uuid, os, tempfile, random, re, weakref
+import socket, select, ssl, uuid, os, tempfile
+import random, re, weakref, time, hashlib
 from subprocess import Popen, PIPE
 from os.path import join as joinpath
 from os.path import abspath
@@ -118,10 +119,18 @@ class SlockyServer(object):
         self.__s.setblocking(0)
         self.__sockets = []
         self.__clients = []
-        self.__pending_devices = []
+
+        self.__nossl_s = socket.socket()
+        self.__s.bind((host, port+1))
+        self.__listen(5)
+        self.__set_blocking(0)
+
+        self.__pending = None
 
     def __connect_client(self, socket, address):
-
+        """
+        Connects a new client over ssl.
+        """
         ssl_wrapper = ssl.wrap_socket(
             socket, server_side=True,
             certfile = self.__certfile,
@@ -131,13 +140,36 @@ class SlockyServer(object):
         self.__clients.append(client)
         return client
 
+    def __serve_cert(self, *sock, addr):
+        """
+        Serves a certificate and a salted checksum in the clear, closes out
+        the socket connection.
+        """
+
+        stamp = time.time() - self.__pending[1]
+        if stamp > 60*5:
+            # passphrase expired
+            sock.send("ERROR:Device pairing expired.")
+            sock.close()
+            self.__pending = None
+            return
+            
+        with open(self.__certfile, "r") as certfile:
+            cert_data = certfile.read()
+        salt = self.__pending[0]
+        checksum = hashlib.sha512(salt+cert_data).hexdigest()
+        msg = "CERT:{0}:{1}:{2}".format(len(checksum), checksum, cert_data)
+        sock.send(msg)
+        sock.close()
+
     def process_events(self):
         """
         Schedule this somewhere, to process incoming events.
         """
 
         # readable, writeable, errored
-        read_list = [self.__s]
+        read_list = [self.__s, self.__nossl_s] if self.__pending \
+                    else [self.__s]
         # use select to make listening for new connections to be
         # non-blocking
         for s in select.select(read_list, [], [], 0)[0]:
@@ -145,7 +177,10 @@ class SlockyServer(object):
                 # make note of any incoming connections
                 client = self.__connect_client(*self.__s.accept())
                 print "Connected from {0}".format(client.addr)
-
+            elif s is self.__nossl_s:
+                # send the cert and salted checksum and then close the
+                # connection
+                self.__serve_cert(*self.__nossl_s.accept())
         # client.sock.read() is non-blocking, so we don't need to do
         # anything fancy to see if there is new data or not in a
         # timely fashion.
@@ -176,15 +211,18 @@ class SlockyServer(object):
     def add_new_device(self):
         """
         Generate a pass phrase for passing the cert to a new client.
+        Note, that if there is already a pending pairing, this will
+        effectively expire the previous pairing.
         """
-
+        
         magic_words = []
         words = [i for i in BASIC_ENGLISH if len(i) >=4]
         random.shuffle(words)
         magic_words = words[:4]
 
         device_code = " ".join(magic_words)
-        self.__pending_devices.append(device_code)
+
+        self.__pending = (device_code, time.time())
         return device_code
 
     def shutdown(self):

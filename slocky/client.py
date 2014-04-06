@@ -35,6 +35,9 @@ class SlockyClient(object):
         has_cert = os.path.isfile(self.__certfile):
         has_id = os.path.isfile(self.__idfile):
 
+        self.__host = host
+        self.__port = port
+
         if not has_cert:
             self.__cert_fetch()
 
@@ -45,7 +48,9 @@ class SlockyClient(object):
             self.__connect()
 
     def __cert_fetch(self):
-        pass
+        nossl_s = socket.socket()
+        nossl_s.connect((self.__host, self.__port+1))
+        
 
     def __gen_device_id(self):
         pass

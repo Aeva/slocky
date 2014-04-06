@@ -21,7 +21,7 @@ from threading import Thread
 from slocky.server import *
 
 
-TEST_PORT = random.randint(49152, 65535)
+TEST_PORT = random.randint(49152, 65534)
 
 
 def test_cert_generation():
