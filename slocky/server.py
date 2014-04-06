@@ -76,6 +76,9 @@ class SlockyServer(object):
         # - https://www.openssl.org/docs/HOWTO/certificates.txt
         #
 
+        # Actually what follows seems to work fine now.  Huh.  Leaving
+        # the above comment incase it doesn't again...?
+
         assert os.path.isdir(server_dir)
         cmd = "openssl req -x509 -newkey rsa:4096 -keyout {0}"
         cmd += " -out {1} -days 365 -passout pass:{2}"
