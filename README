@@ -1,2 +1,27 @@
 
-...bwuh?
+-- What is this?
+
+Slocky is a simple communication framework built on top of tls for
+(hopefully) secure message passing.  Messages can be any sort of json
+serializable object.  The model assumes a singular central server
+which some number of clients connect to.
+
+Slocky automates the creation of the ssl key and certificate, and
+[will feature] a means by which one can securly register new clients
+and distribute the certificate.
+
+
+-- Installation
+
+Once the repository is cloned, be sure to run:
+$ python setup.py develop
+
+
+-- Tests
+
+Slocky uses nosetests.
+
+
+-- Examples
+
+See slocky/examples/ for potential usage.
