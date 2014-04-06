@@ -18,10 +18,12 @@
 import ssl, socket
 
 
+from slocky.packet import encode
+
 
 
 def test_client():
     s = socket.socket()
     ssl_sock = ssl.wrap_socket(s, ca_certs="certfile", cert_reqs=ssl.CERT_REQUIRED)
     ssl_sock.connect(('localhost', 14900))
-    ssl_sock.write("I'm a hedgehog!\n")
+    ssl_sock.write(encode("I'm a hedgehog!\n"))

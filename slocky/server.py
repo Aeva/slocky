@@ -20,6 +20,8 @@ from subprocess import Popen, PIPE
 from os.path import join as joinpath
 from os.path import abspath
 
+from slocky.packet import encode, decode
+
 # for reference: https://docs.python.org/2/library/ssl.html
 
 
@@ -42,11 +44,13 @@ class ClientConnection(object):
         new_data = self.sock.read()
         if new_data:
             self.pending += new_data
-            print "New data from {0}: {1}".format(self.addr, new_data)
+            packets, remainder = decode(self.pending)
+            if packets:
+                self.pending = remainder
+                for packet in packets:
+                    self.__server().on_message(self, packet)
+
         
-
-
-
 class SlockyServer(object):
     """
     """
@@ -148,14 +152,26 @@ class SlockyServer(object):
         for client in self.__clients:
             client.cycle()
         
-    def on_message(self, msg_object):
+    def on_message(self, client, packet):
         """
         Duckpunch me lol.
         """
-        pass
+        print "New data from {0}: {1}".format(
+            client.addr, str(packet["data"]))
     
-    def send_message(self, msg_object, target=None):
-        pass
+    def send_message(self, data, clients=None):
+        """
+        Encapsulates data as packets, and sends to the specified clients.
+        If clients is None, this broadcasts the data to all clients.
+        """
+        packet = encode(data)
+
+        if not clients:
+            clients = self.clients
+
+        for client in clients:
+            # may or may not be correct
+            clients.sock.write(packet)
 
     def add_new_device(self):
         """
