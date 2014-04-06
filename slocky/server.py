@@ -100,7 +100,6 @@ class SlockyServer(object):
         # generate a passwordless key
         args = "openssl pkey -in {0} -out {1} -passin pass:{2}".format(
                 tmp_file, self.__keyfile, passwd).split(" ")
-        print args
         proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         proc.communicate()
 
@@ -194,3 +193,9 @@ class SlockyServer(object):
         device_code = " ".join(magic_words)
         self.__pending_devices.append(device_code)
         return device_code
+
+    def shutdown(self):
+        """
+        Close connections and shut down the socket?
+        """
+        pass
