@@ -123,7 +123,7 @@ class SlockyServer(object):
             certfile = self.__certfile,
             keyfile = self.__keyfile,
             ssl_version = ssl.PROTOCOL_TLSv1)
-        client = ClientConnection(ssl_wrapper, address)
+        client = ClientConnection(self, ssl_wrapper, address)
         self.__clients.append(client)
         return client
 
@@ -139,8 +139,7 @@ class SlockyServer(object):
         for s in select.select(read_list, [], [], 0)[0]:
             if s is self.__s:
                 # make note of any incoming connections
-                args = [self] + self.__s.accept()
-                client = self.__connect_client(*args)
+                client = self.__connect_client(*self.__s.accept())
                 print "Connected from {0}".format(client.addr)
 
         # client.sock.read() is non-blocking, so we don't need to do
