@@ -23,47 +23,56 @@ from slocky.server import *
 from slocky.client import *
 
 TEST_PORT = random.randint(49152, 65534)
-
+HOST = 'localhost'
 
 
 def test_cert_fetch():
     server_dir = tempfile.mkdtemp()
     client_dir = tempfile.mkdtemp()
-    # cert_path = os.path.join(server_dir, "certfile")
-    # test_phrase = "I'm a hedgehog!\n"
-    # srv_stop = False
-    # results = {
-    #     "recieved" : False,
-    #     "data" : [],
-    # }
 
-    # srv = SlockyServer('localhost', TEST_PORT, server_dir)
-    # def msg_handler(client, packet):
-    #     results["recieved"] = True
-    #     results["data"].append(packet["data"])
-    # srv.on_message = msg_handler
+    srv_stop = False
+    server = SlockyServer(HOST, TEST_PORT, server_dir)
+    client = SlockyClient(HOST, TEST_PORT, client_dir)
 
-    # def srv_thread():
-    #     while not srv_stop:
-    #         srv.process_events()            
-    #         time.sleep(.1)
-    #     srv.shutdown()
+    device_key = server.add_new_device()
 
-    # thread = Thread(target = srv_thread)
-    # thread.start()
-    # try:
-    #     s = socket.socket()
-    #     s.settimeout(1)
-    #     ssl_sock = ssl.wrap_socket(
-    #         s, ca_certs=cert_path, cert_reqs=ssl.CERT_REQUIRED)
-    #     ssl_sock.connect(('localhost', TEST_PORT))
-    #     ssl_sock.write(encode(test_phrase))
-    #     srv_stop = True
-    #     thread.join()
-    # except:
-    #     srv_stop = True
-    #     thread.join()
-    #     raise
+    results = {
+        "client_prompted" : False,
+        "client_connected" : False,
+    }
 
-    # assert results["recieved"]
-    # assert results["data"][0] == test_phrase
+    def srv_thread():
+        while not srv_stop:
+            server.process_events()
+            time.sleep(.1)
+        server.shutdown()
+
+    thread = Thread(target=srv_thread)
+    thread.start()
+
+    def on_validate():
+        client.validate_device(device_key)
+        results["client_prompted"] = True
+
+    def on_connected():
+        results["client_connected"] = True
+        
+    client.on_validate = on_validate
+    client.on_connected = on_connected
+
+    try:
+        client.connect()
+        for i in range(10):
+            client.process_events()
+            time.sleep(.2)
+        client.shutdown()
+        srv_stop = True
+        thread.join()
+    except:
+        srv_stop = True
+        thread.join()
+        raise
+
+    assert os.path.isfile(os.path.join(client_dir, "certfile"))
+    assert results["client_prompted"] == True
+    assert results["client_connected"] == True

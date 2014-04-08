@@ -34,23 +34,38 @@ class ClientConnection(object):
     def __init__(self, server, ssl_socket, address):
         self.addr = address
         self.sock = ssl_socket
+        self.sock.setblocking(0)
         self.pending = ""
         self.__server = weakref.ref(server)
+        self.device_id = None
+
+    def assign_device_id(self):
+        """
+        Assign the client a device id.
+        """
+        self.device_id = str(uuid.uuid4())
+        self.sock.write(encode({
+            "device_id" : self.device_id,
+            "command" : "assign_device_id",
+        }))
+        self.__server().save_device_id(self.device_id)
 
     def cycle(self):
         """
         Read new data from the client, and do any processing if
         necessary.
         """
-
-        new_data = self.sock.read()
+        try:
+            new_data = self.sock.read()
+        except ssl.SSLError:
+            new_data = ""
         if new_data:
             self.pending += new_data
             packets, remainder = decode(self.pending)
             if packets:
                 self.pending = remainder
                 for packet in packets:
-                    self.__server().on_message(self, packet)
+                    self.__server().check_message(self, packet)
 
         
 class SlockyServer(object):
@@ -121,9 +136,9 @@ class SlockyServer(object):
         self.__clients = []
 
         self.__nossl_s = socket.socket()
-        self.__s.bind((host, port+1))
-        self.__listen(5)
-        self.__set_blocking(0)
+        self.__nossl_s.bind((host, port+1))
+        self.__nossl_s.listen(5)
+        self.__nossl_s.setblocking(0)
 
         self.__pending = None
 
@@ -140,7 +155,7 @@ class SlockyServer(object):
         self.__clients.append(client)
         return client
 
-    def __serve_cert(self, *sock, addr):
+    def __serve_cert(self, sock, addr):
         """
         Serves a certificate and a salted checksum in the clear, closes out
         the socket connection.
@@ -162,6 +177,36 @@ class SlockyServer(object):
         sock.send(msg)
         sock.close()
 
+    def save_device_id(self, client):
+        """
+        Save a client's newly assigned device_id so that they can connect
+        again later on.
+        """
+        raise NotImplementedError("saving device_id for future reference")
+
+    def check_message(self, client, packet):
+        """
+        Handles data from the client, calls on_message if the data doesn't
+        pertain to the communication layer itself.  If the client
+        connection hasn't provided a device id, then messages from the
+        client won't be processed.
+        """
+        data = packet["data"]
+        ignore = True
+        if data.has_key("command"):
+            if data["command"] == "req_device_id" \
+               and data.has_key("tmp_phrase"):
+                if data["tmp_phrase"] == self.__pending[0]:
+                    self.__pending = None
+                    client.assign_device_id()
+                    raise NotImplementedError("timestamp expiration check")
+                else:
+                    raise NotImplementedError("req_device_id failure")
+
+        # FIXME: determine when the client should not be ignored
+        if not ignore:
+            self.on_message(client, packet)
+
     def process_events(self):
         """
         Schedule this somewhere, to process incoming events.
@@ -176,7 +221,7 @@ class SlockyServer(object):
             if s is self.__s:
                 # make note of any incoming connections
                 client = self.__connect_client(*self.__s.accept())
-                print "Connected from {0}".format(client.addr)
+                # TODO: log this?
             elif s is self.__nossl_s:
                 # send the cert and salted checksum and then close the
                 # connection
