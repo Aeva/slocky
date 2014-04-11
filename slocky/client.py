@@ -33,6 +33,11 @@ class SlockyClient(object):
         self.__certfile = abspath(join(client_dir, "certfile"))
         self.__idfile = abspath(join(client_dir, "device"))
         self.__device_id = None
+
+        if os.path.isfile(self.__idfile):
+            with open(self.__idfile, "r") as id_file:
+                self.__device_id = id_file.read().strip()
+
         self.__host = host
         self.__port = port
         self.__connected = False
@@ -136,6 +141,8 @@ class SlockyClient(object):
         Sets and saves the assigned device id.
         """
         self.__device_id = device_id
+        with open(self.__idfile, "w") as id_file:
+            id_file.write(str(device_id))
         if not self.__connected:
             self.__connected = True
             self.on_connected()
