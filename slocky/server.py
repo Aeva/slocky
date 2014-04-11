@@ -74,6 +74,7 @@ class SlockyServer(object):
     def __init__(self, host, port, server_dir):
         self.__certfile = abspath(joinpath(server_dir, "certfile"))
         self.__keyfile = abspath(joinpath(server_dir, "keyfile"))
+        self.__ids_file = abspath(joinpath(server_dir, "devices"))
        
         try:
             assert os.path.isfile(self.__certfile)
@@ -134,6 +135,11 @@ class SlockyServer(object):
         self.__s.setblocking(0)
         self.__sockets = []
         self.__clients = []
+        self.__devices = []
+
+        if os.path.isfile(self.__ids_file):
+            with open(self.__ids_file, "r") as ids_file:
+                self.__devices = ids_file.read().strip().split("\n")
 
         self.__nossl_s = socket.socket()
         self.__nossl_s.bind((host, port+1))
@@ -177,13 +183,16 @@ class SlockyServer(object):
         sock.send(msg)
         sock.close()
 
-    def save_device_id(self, client):
+    def save_device_id(self, device_id):
         """
         Save a client's newly assigned device_id so that they can connect
         again later on.
         """
-        raise NotImplementedError("saving device_id for future reference")
-
+        assert device_id is not None
+        self.__devices.append(device_id)
+        with open(self.__ids_file, "a") as id_cache:
+            id_cache.write(str(device_id)+"\n")
+        
     def check_message(self, client, packet):
         """
         Handles data from the client, calls on_message if the data doesn't
