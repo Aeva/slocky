@@ -27,6 +27,9 @@ HOST = 'localhost'
 
 
 def test_cert_fetch():
+    """
+    Test the process of validating a new client.
+    """
     server_dir = tempfile.mkdtemp()
     client_dir = tempfile.mkdtemp()
 
@@ -76,3 +79,14 @@ def test_cert_fetch():
     assert os.path.isfile(os.path.join(client_dir, "certfile"))
     assert results["client_prompted"] == True
     assert results["client_connected"] == True
+
+    client_id = client._SlockyClient__device_id 
+    client_id_path = client._SlockyClient__idfile
+    server_ids = server._SlockyServer__devices
+    server_ids_path = server._SlockyServer__ids_file
+    
+    assert client_id is not None
+    assert server_ids.count(client_id) == 0
+    assert os.path.isfile(client_id_path)
+    assert os.path.isfile(server_ids_path)
+
