@@ -24,6 +24,12 @@ from slocky.packet import encode, decode
 
 
 
+class SlockyClientError(Exception):
+    pass
+
+
+
+
 class SlockyClient(object):
     """
     """
@@ -164,6 +170,7 @@ class SlockyClient(object):
         """
         Schedule this somewhere, to process incoming data from the server.
         """
+        assert self._connected
         try:
             new_data = self._sock.read()
         except ssl.SSLError:
