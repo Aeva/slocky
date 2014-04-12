@@ -256,6 +256,13 @@ def test_communication():
     assert client.echos[1] == "second message"
 
 
+def test_cert_req_refused():
+    """
+    Client response for when server refuses to serve cert.
+    """
+    assert False
+
+
 def test_reconnection():
     """
     Client reconnection test.
