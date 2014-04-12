@@ -223,7 +223,7 @@ class SlockyServer(object):
         with open(self._ids_path, "a") as id_cache:
             id_cache.write(str(device_id)+"\n")
 
-    def disconnected_cat(self, client):
+    def disconnected_client(self, client):
         """
         Called when a client's connection closed.
         """
