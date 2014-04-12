@@ -67,6 +67,15 @@ class ClientConnection(object):
                 for packet in packets:
                     self._server().check_message(self, packet)
 
+    def send(self, data):
+        """
+        Send something to the client.
+        """
+        packet = encode(data, self.device_id)
+        self.sock.write(packet)
+
+
+
         
 class SlockyServer(object):
     """
@@ -226,6 +235,7 @@ class SlockyServer(object):
         client won't be processed.
         """
         data = packet["data"]
+        device_id = packet["id"]
         ignore = True
         if data.has_key("command"):
             if data["command"] == "req_device_id" \
@@ -237,9 +247,11 @@ class SlockyServer(object):
                 else:
                     self.revoke_client(client)
 
-        # FIXME: determine when the client should not be ignored
+        if device_id and self._devices.count(device_id):
+            ignore = False
+
         if not ignore:
-            self.on_message(client, packet)
+            self.on_message(client, data)
 
     def process_events(self):
         """
@@ -266,12 +278,12 @@ class SlockyServer(object):
         for client in self._clients:
             client.cycle()
         
-    def on_message(self, client, packet):
+    def on_message(self, client, data):
         """
         Duckpunch me lol.
         """
         print "New data from {0}: {1}".format(
-            client.addr, str(packet["data"]))
+            client.addr, str(data))
     
     def send_message(self, data, clients=None):
         """

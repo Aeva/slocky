@@ -162,8 +162,10 @@ class SlockyClient(object):
                packet["data"]["command"] == "assign_device_id":
                 self._assign_device_id(packet["data"]["device_id"])
         else:
-            raise NotImplementedError(
-                "message processing when client has a device id")
+            # FIXME: this should probably fail very loudly because it
+            # almost certainly means a man-in-the-middle?
+            assert packet["id"] == self._device_id
+            self.on_message(packet["data"])
             
     def process_events(self):
         """
@@ -181,6 +183,14 @@ class SlockyClient(object):
                 self._cache = remainder
                 for packet in packets:
                     self._process_message(packet)
+
+    def send(self, data):
+        """
+        Try to send data to the server.  Data should be json serializable.
+        """
+        assert self._device_id is not None
+        packet = encode(data, self._device_id)
+        self._sock.write(packet)
 
     def on_message(self, msg_object):
         """

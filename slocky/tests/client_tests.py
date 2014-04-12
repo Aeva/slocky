@@ -94,6 +94,8 @@ def test_cert_fetch():
         client.connect()
         for i in range(10):
             client.process_events()
+            if client._device_id:
+                break
             time.sleep(.2)
         client.shutdown()
         server.stop()
@@ -179,6 +181,8 @@ def test_bad_pairing():
         client.connect()
         for i in range(10):
             client.process_events()
+            if client._device_id:
+                break
             time.sleep(.2)
         server.stop()
         server.join()
@@ -189,16 +193,67 @@ def test_bad_pairing():
     assert not client._device_id
 
 
-def test_timeout():
+def test_communication():
     """
-    Pairing timeout test.
+    Client-server communication test.
 
-    In this test, the client should start performing a device pairing,
-    change the timeout value on the server to 0, and fail the device
-    pairing.  It should do so for the two phases of the device pairing
-    process for which the server checks for timeouts.
+    This test should connect a client to the server, perform the device
+    pairing, send a message, receive a reply, disconnect, reconnect,
+    send a message, receive a reply.
     """
-    assert False
+
+    test_port = gen_port()
+    server = BasicServer(test_port)
+    client = BasicClient(test_port, server.add_new_device())
+
+    def srv_on_message(client, data):
+        server.called_on_message = True
+        if data.has_key('command') and data['command'] == "echo":
+            client.send({
+                "command" : "alert",
+                "phrase" : data["phrase"],
+            })
+    server.on_message = srv_on_message
+
+    client.echos = []
+    def cli_on_message(msg_data):
+        client.called_on_message = True
+        if msg_data["command"] == "alert":
+            client.echos.append(msg_data["phrase"])
+    client.on_message = cli_on_message
+
+    try: 
+        server.start()
+        client.connect()
+
+        for i in range(5):
+            client.process_events()
+            if client._device_id:
+                break
+            time.sleep(.2)
+
+        client.send({
+            "command" : "echo",
+            "phrase" : "first message",
+        })
+        client.send({
+            "command" : "echo",
+            "phrase" : "second message",
+        })
+
+        for i in range(5):
+            client.process_events()
+            time.sleep(.2)
+        server.stop()
+        server.join()
+    except:
+        server.stop()
+        raise
+
+    assert server.called_on_message
+    assert len(client.echos) == 2
+    assert client.echos[0] == "first message"
+    assert client.echos[1] == "second message"
 
 
 def test_reconnection():
@@ -213,13 +268,14 @@ def test_reconnection():
     assert False
 
 
-def test_communication():
+def test_timeout():
     """
-    Client-server communication test.
+    Pairing timeout test.
 
-    This test should connect a client to the server, perform the device
-    pairing, send a message, receive a reply, disconnect, reconnect,
-    send a message, receive a reply.
+    In this test, the client should start performing a device pairing,
+    change the timeout value on the server to 0, and fail the device
+    pairing.  It should do so for the two phases of the device pairing
+    process for which the server checks for timeouts.
     """
     assert False
 
