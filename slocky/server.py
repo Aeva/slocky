@@ -204,6 +204,19 @@ class SlockyServer(object):
         self._devices.append(device_id)
         with open(self._ids_path, "a") as id_cache:
             id_cache.write(str(device_id)+"\n")
+
+    def revoke_client(self, client):
+        """
+        Called when a client attempts to perform a device pairing with an
+        unexpected pass phrase.
+        """
+        # FIXME: perhaps at a point wherein there are paranoia levels
+        # for the server, do something other than just close down the
+        # socket, blocking the ip address, tec?
+        
+        # FIXME: consider logging when this happens :P
+        self._clients.pop(self._clients.index(client))
+        client.sock.close()
         
     def check_message(self, client, packet):
         """
@@ -222,7 +235,7 @@ class SlockyServer(object):
                         self._pending = None
                         client.assign_device_id()
                 else:
-                    raise NotImplementedError("bad pass phrase for req_device_id")
+                    self.revoke_client(client)
 
         # FIXME: determine when the client should not be ignored
         if not ignore:
