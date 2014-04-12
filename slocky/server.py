@@ -36,7 +36,7 @@ class ClientConnection(object):
         self.sock = ssl_socket
         self.sock.setblocking(0)
         self.pending = ""
-        self.__server = weakref.ref(server)
+        self._server = weakref.ref(server)
         self.device_id = None
 
     def assign_device_id(self):
@@ -48,7 +48,7 @@ class ClientConnection(object):
             "device_id" : self.device_id,
             "command" : "assign_device_id",
         }))
-        self.__server().save_device_id(self.device_id)
+        self._server().save_device_id(self.device_id)
 
     def cycle(self):
         """
@@ -65,26 +65,28 @@ class ClientConnection(object):
             if packets:
                 self.pending = remainder
                 for packet in packets:
-                    self.__server().check_message(self, packet)
+                    self._server().check_message(self, packet)
 
         
 class SlockyServer(object):
     """
     """
     def __init__(self, host, port, server_dir):
-        self.__certfile = abspath(joinpath(server_dir, "certfile"))
-        self.__keyfile = abspath(joinpath(server_dir, "keyfile"))
-        self.__ids_file = abspath(joinpath(server_dir, "devices"))
+        self._certfile = abspath(joinpath(server_dir, "certfile"))
+        self._keyfile = abspath(joinpath(server_dir, "keyfile"))
+        self._ids_file = abspath(joinpath(server_dir, "devices"))
+
+        self._timeout_period = 60*5 # five minutes
        
         try:
-            assert os.path.isfile(self.__certfile)
-            assert os.path.isfile(self.__keyfile)
+            assert os.path.isfile(self._certfile)
+            assert os.path.isfile(self._keyfile)
         except AssertionError:
-            self.__cert_setup(server_dir)
+            self._cert_setup(server_dir)
 
-        self.__socket_setup(host, port)
+        self._socket_setup(host, port)
         
-    def __cert_setup(self, server_dir):
+    def _cert_setup(self, server_dir):
         """
         Generate new certificates etc for slocky to use.
         """
@@ -109,7 +111,7 @@ class SlockyServer(object):
 
         passwd = str(uuid.uuid4())
         args = cmd.format(
-            tmp_file, self.__certfile, passwd).split(" ")
+            tmp_file, self._certfile, passwd).split(" ")
 
         # generate an ssl cert and key
         proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
@@ -117,71 +119,81 @@ class SlockyServer(object):
 
         # generate a passwordless key
         args = "openssl pkey -in {0} -out {1} -passin pass:{2}".format(
-                tmp_file, self.__keyfile, passwd).split(" ")
+                tmp_file, self._keyfile, passwd).split(" ")
         proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         proc.communicate()
 
         # delete the passworded key
         os.remove(tmp_file)
         
-    def __socket_setup(self, host, port):
+    def _socket_setup(self, host, port):
         """
         Open and listen to our socket 
         """
         
-        self.__s = socket.socket()
-        self.__s.bind((host, port))
-        self.__s.listen(5)
-        self.__s.setblocking(0)
-        self.__sockets = []
-        self.__clients = []
-        self.__devices = []
+        self._s = socket.socket()
+        self._s.bind((host, port))
+        self._s.listen(5)
+        self._s.setblocking(0)
+        self._sockets = []
+        self._clients = []
+        self._devices = []
 
-        if os.path.isfile(self.__ids_file):
-            with open(self.__ids_file, "r") as ids_file:
-                self.__devices = ids_file.read().strip().split("\n")
+        if os.path.isfile(self._ids_file):
+            with open(self._ids_file, "r") as ids_file:
+                self._devices = ids_file.read().strip().split("\n")
 
-        self.__nossl_s = socket.socket()
-        self.__nossl_s.bind((host, port+1))
-        self.__nossl_s.listen(5)
-        self.__nossl_s.setblocking(0)
+        self._nossl_s = socket.socket()
+        self._nossl_s.bind((host, port+1))
+        self._nossl_s.listen(5)
+        self._nossl_s.setblocking(0)
 
-        self.__pending = None
+        self._pending = None
 
-    def __connect_client(self, socket, address):
+    def _connect_client(self, socket, address):
         """
         Connects a new client over ssl.
         """
         ssl_wrapper = ssl.wrap_socket(
             socket, server_side=True,
-            certfile = self.__certfile,
-            keyfile = self.__keyfile,
+            certfile = self._certfile,
+            keyfile = self._keyfile,
             ssl_version = ssl.PROTOCOL_TLSv1)
         client = ClientConnection(self, ssl_wrapper, address)
-        self.__clients.append(client)
+        self._clients.append(client)
         return client
 
-    def __serve_cert(self, sock, addr):
+    def _check_pair_expiration(self, sock, addr):
+        """
+        Checks to see if a pending device pairing has expired.  Serves an
+        error message to the client if it has; returns True if the
+        pair expired and False if it is still good.
+        """
+
+        stamp = time.time() - self._pending[1]
+        if stamp > self._timeout_period:
+            # passphrase expired
+            sock.send("ERROR:Device pairing expired.")
+            sock.close()
+            self._pending = None
+            return True
+        else:
+            return False
+
+    def _serve_cert(self, sock, addr):
         """
         Serves a certificate and a salted checksum in the clear, closes out
         the socket connection.
         """
 
-        stamp = time.time() - self.__pending[1]
-        if stamp > 60*5:
-            # passphrase expired
-            sock.send("ERROR:Device pairing expired.")
+        if not self._check_pair_expiration(sock, addr):
+            with open(self._certfile, "r") as certfile:
+                cert_data = certfile.read()
+            salt = self._pending[0]
+            checksum = hashlib.sha512(salt+cert_data).hexdigest()
+            msg = "CERT:{0}:{1}:{2}".format(len(checksum), checksum, cert_data)
+            sock.send(msg)
             sock.close()
-            self.__pending = None
-            return
-            
-        with open(self.__certfile, "r") as certfile:
-            cert_data = certfile.read()
-        salt = self.__pending[0]
-        checksum = hashlib.sha512(salt+cert_data).hexdigest()
-        msg = "CERT:{0}:{1}:{2}".format(len(checksum), checksum, cert_data)
-        sock.send(msg)
-        sock.close()
 
     def save_device_id(self, device_id):
         """
@@ -189,8 +201,8 @@ class SlockyServer(object):
         again later on.
         """
         assert device_id is not None
-        self.__devices.append(device_id)
-        with open(self.__ids_file, "a") as id_cache:
+        self._devices.append(device_id)
+        with open(self._ids_file, "a") as id_cache:
             id_cache.write(str(device_id)+"\n")
         
     def check_message(self, client, packet):
@@ -205,12 +217,12 @@ class SlockyServer(object):
         if data.has_key("command"):
             if data["command"] == "req_device_id" \
                and data.has_key("tmp_phrase"):
-                if data["tmp_phrase"] == self.__pending[0]:
-                    self.__pending = None
-                    client.assign_device_id()
-                    raise NotImplementedError("timestamp expiration check")
+                if data["tmp_phrase"] == self._pending[0]:
+                    if not self._check_pair_expiration(client.sock, client.addr):
+                        self._pending = None
+                        client.assign_device_id()
                 else:
-                    raise NotImplementedError("req_device_id failure")
+                    raise NotImplementedError("bad pass phrase for req_device_id")
 
         # FIXME: determine when the client should not be ignored
         if not ignore:
@@ -222,23 +234,23 @@ class SlockyServer(object):
         """
 
         # readable, writeable, errored
-        read_list = [self.__s, self.__nossl_s] if self.__pending \
-                    else [self.__s]
+        read_list = [self._s, self._nossl_s] if self._pending \
+                    else [self._s]
         # use select to make listening for new connections to be
         # non-blocking
         for s in select.select(read_list, [], [], 0)[0]:
-            if s is self.__s:
+            if s is self._s:
                 # make note of any incoming connections
-                client = self.__connect_client(*self.__s.accept())
+                client = self._connect_client(*self._s.accept())
                 # TODO: log this?
-            elif s is self.__nossl_s:
+            elif s is self._nossl_s:
                 # send the cert and salted checksum and then close the
                 # connection
-                self.__serve_cert(*self.__nossl_s.accept())
+                self._serve_cert(*self._nossl_s.accept())
         # client.sock.read() is non-blocking, so we don't need to do
         # anything fancy to see if there is new data or not in a
         # timely fashion.
-        for client in self.__clients:
+        for client in self._clients:
             client.cycle()
         
     def on_message(self, client, packet):
@@ -276,7 +288,7 @@ class SlockyServer(object):
 
         device_code = " ".join(magic_words)
 
-        self.__pending = (device_code, time.time())
+        self._pending = (device_code, time.time())
         return device_code
 
     def shutdown(self):

@@ -30,48 +30,48 @@ class SlockyClient(object):
 
     def __init__(self, host, port, client_dir):
         assert os.path.isdir(client_dir)
-        self.__certfile = abspath(join(client_dir, "certfile"))
-        self.__idfile = abspath(join(client_dir, "device"))
-        self.__device_id = None
+        self._certfile = abspath(join(client_dir, "certfile"))
+        self._idfile = abspath(join(client_dir, "device"))
+        self._device_id = None
 
-        if os.path.isfile(self.__idfile):
-            with open(self.__idfile, "r") as id_file:
-                self.__device_id = id_file.read().strip()
+        if os.path.isfile(self._idfile):
+            with open(self._idfile, "r") as id_file:
+                self._device_id = id_file.read().strip()
 
-        self.__host = host
-        self.__port = port
-        self.__connected = False
+        self._host = host
+        self._port = port
+        self._connected = False
 
-        self.__cert_data = None
-        self.__cert_checksum = None
-        self.__passphrase = None
-        self.__cache = ""
+        self._cert_data = None
+        self._cert_checksum = None
+        self._passphrase = None
+        self._cache = ""
 
     def connect(self):
         """
         Attempt to connect to the server.
         """
-        if not os.path.isfile(self.__certfile):
+        if not os.path.isfile(self._certfile):
             # first we need to download and validate the server's
             # certificate
-            self.__cert_fetch()
+            self._cert_fetch()
 
-        if os.path.isfile(self.__certfile):
+        if os.path.isfile(self._certfile):
             # if we have a valid certificate, open a new connection
-            self.__connect()
+            self._connect()
 
-            if not self.__device_id:
+            if not self._device_id:
                 # if we don't yet have a device id established, do
                 # that now before doing anything else
-                self.__gen_device_id()
+                self._gen_device_id()
 
-            if self.__device_id and not self.__connected:
-                self.__connected = True
+            if self._device_id and not self._connected:
+                self._connected = True
                 self.on_connected()
             
-    def __cert_fetch(self):
+    def _cert_fetch(self):
         nossl_s = socket.socket()
-        nossl_s.connect((self.__host, self.__port+1))
+        nossl_s.connect((self._host, self._port+1))
 
         cache = ""
         stream = ""
@@ -91,71 +91,71 @@ class SlockyClient(object):
             checksum = cache[check_offset:check_offset+check_size]
             cert_offset = check_offset+check_size+1
 
-            self.__cert_checksum = checksum
-            self.__cert_data = cache[cert_offset:]
+            self._cert_checksum = checksum
+            self._cert_data = cache[cert_offset:]
             self.on_validate()
             
         else:
             raise NotImplementedError(
                 "Error handling when the cert req is refused")
 
-    def __gen_device_id(self):
+    def _gen_device_id(self):
         """
         Request a device_id.
         """
         data = {
             "command" : "req_device_id",
-            "tmp_phrase" : self.__passphrase,
+            "tmp_phrase" : self._passphrase,
         }
         packet = encode(data)
-        self.__sock.write(packet)
+        self._sock.write(packet)
 
-    def __connect(self):
+    def _connect(self):
         """
         Setup the socket.
         """
-        self.__nossl_s = socket.socket()
-        self.__sock = ssl.wrap_socket(
-            self.__nossl_s, ca_certs=self.__certfile, 
+        self._nossl_s = socket.socket()
+        self._sock = ssl.wrap_socket(
+            self._nossl_s, ca_certs=self._certfile, 
             cert_reqs=ssl.CERT_REQUIRED)
-        self.__sock.connect((self.__host, self.__port))
-        self.__sock.setblocking(0)
+        self._sock.connect((self._host, self._port))
+        self._sock.setblocking(0)
 
     def validate_device(self, passphrase):
         """
         Call this from within on_validate to validate and hopefully save
         the incoming certificate.
         """
-        checksum = hashlib.sha512(passphrase+self.__cert_data).hexdigest()
-        if self.__cert_checksum == checksum:
+        checksum = hashlib.sha512(passphrase+self._cert_data).hexdigest()
+        if self._cert_checksum == checksum:
             # certificate checksum passed!
-            self.__passphrase = passphrase
-            with open(self.__certfile, "w") as cert_file:
-                cert_file.write(self.__cert_data)
+            self._passphrase = passphrase
+            with open(self._certfile, "w") as cert_file:
+                cert_file.write(self._cert_data)
         else:
             # certificate checksum failed
-            raise NotImplementedError("Handeling of cert checksum failure")
+            self.on_checksum_fail(passphrase)
 
-    def __assign_device_id(self, device_id):
+    def _assign_device_id(self, device_id):
         """
         Sets and saves the assigned device id.
         """
-        self.__device_id = device_id
-        with open(self.__idfile, "w") as id_file:
+        self._device_id = device_id
+        with open(self._idfile, "w") as id_file:
             id_file.write(str(device_id))
-        if not self.__connected:
-            self.__connected = True
+        if not self._connected:
+            self._connected = True
             self.on_connected()
 
-    def __process_message(self, packet):
+    def _process_message(self, packet):
         """
         Determine if an event should be raised or not from received
         packets.
         """
-        if not self.__device_id:
+        if not self._device_id:
             if packet["data"].has_key("command") and \
                packet["data"]["command"] == "assign_device_id":
-                self.__assign_device_id(packet["data"]["device_id"])
+                self._assign_device_id(packet["data"]["device_id"])
         else:
             raise NotImplementedError(
                 "message processing when client has a device id")
@@ -165,16 +165,16 @@ class SlockyClient(object):
         Schedule this somewhere, to process incoming data from the server.
         """
         try:
-            new_data = self.__sock.read()
+            new_data = self._sock.read()
         except ssl.SSLError:
             new_data = ""
         if new_data:
-            self.__cache += new_data
-            packets, remainder = decode(self.__cache)
+            self._cache += new_data
+            packets, remainder = decode(self._cache)
             if packets:
-                self.__cache = remainder
+                self._cache = remainder
                 for packet in packets:
-                    self.__process_message(packet)
+                    self._process_message(packet)
 
     def on_message(self, msg_object):
         """
@@ -190,6 +190,12 @@ class SlockyClient(object):
         """
         pass
 
+    def on_checksum_fail(self):
+        """
+        This is called when a certificate checksum fails.
+        """
+        pass
+
     def on_validate(self):
         """
         Override me!  This is called when the user needs to enter in the
@@ -201,4 +207,4 @@ class SlockyClient(object):
         """
         Close the client connection.
         """
-        self.__sock.close()
+        self._sock.close()
