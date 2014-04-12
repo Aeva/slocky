@@ -24,147 +24,175 @@ from slocky.client import *
 
 
 HOST = 'localhost'
-
-
 def gen_port():
     return random.randint(49152, 65534)
+
+
+
+
+class BasicServer(SlockyServer, Thread):
+    def __init__(self, test_port):
+        self.server_dir = tempfile.mkdtemp()
+        SlockyServer.__init__(self, HOST, test_port, self.server_dir)
+        Thread.__init__(self)
+        self.__stop = False
+
+        self.called_on_message = False
+
+    def run(self):
+        while not self.__stop:
+            self.process_events()
+            time.sleep(.1)
+        self.shutdown()
+
+    def stop(self):
+        self.__stop = True
+        self.join()
+
+    def on_message(self, client, packet):
+        self.called_on_message = True
+
+
+
+
+class BasicClient(SlockyClient):
+    def __init__(self, test_port, validation_phrase):
+        self.client_dir = tempfile.mkdtemp()
+        SlockyClient.__init__(self, HOST, test_port, self.client_dir)
+        self.validation_phrase = validation_phrase
+
+        self.called_on_checksum_fail = False
+        self.called_on_validate = False
+        self.called_on_message = False
+        self.called_on_connected = False
+
+    def on_validate(self):
+        self.called_on_validate = True
+        self.validate_device(self.validation_phrase)                             
+
+    def on_checksum_fail(self, passphrase):
+        self.called_on_checksum_fail = True
+
+    def on_connected(self):
+        self.called_on_connected = True
+
+    def on_message(self):
+        self.called_on_message = True
+
+
 
 
 def test_cert_fetch():
     """
     Test the process of validating a new client.
     """
-    server_dir = tempfile.mkdtemp()
-    client_dir = tempfile.mkdtemp()
     test_port = gen_port()
-
-    srv_stop = False
-    server = SlockyServer(HOST, test_port, server_dir)
-    client = SlockyClient(HOST, test_port, client_dir)
-
-    device_key = server.add_new_device()
-
-    results = {
-        "client_prompted" : False,
-        "client_connected" : False,
-    }
-
-    def srv_thread():
-        while not srv_stop:
-            server.process_events()
-            time.sleep(.1)
-        server.shutdown()
-
-    thread = Thread(target=srv_thread)
-    thread.start()
-
-    def on_validate():
-        client.validate_device(device_key)
-        results["client_prompted"] = True
-
-    def on_connected():
-        results["client_connected"] = True
-        
-    client.on_validate = on_validate
-    client.on_connected = on_connected
-
+    server = BasicServer(test_port)
+    client = BasicClient(test_port, server.add_new_device())
     try:
+        server.start()
         client.connect()
         for i in range(10):
             client.process_events()
             time.sleep(.2)
         client.shutdown()
-        srv_stop = True
-        thread.join()
+        server.stop()
+        server.join()
     except:
-        srv_stop = True
-        thread.join()
+        server.stop()
+        server.join()
         raise
 
-    assert os.path.isfile(os.path.join(client_dir, "certfile"))
-    assert results["client_prompted"] == True
-    assert results["client_connected"] == True
+    assert os.path.isfile(os.path.join(client.client_dir, "certfile"))
+    assert client.called_on_validate
+    assert client.called_on_connected
 
     client_id = str(client._device_id)
-    client_id_path = client._idfile
     server_ids = server._devices
-    server_ids_path = server._ids_file
     
     assert client_id is not None
     assert server_ids.count(client_id) == 1
-    assert os.path.isfile(client_id_path)
-    assert os.path.isfile(server_ids_path)
+    assert os.path.isfile(client._id_path)
+    assert os.path.isfile(server._ids_path)
 
 
 def test_bad_checksum():
     """
-    In this test we give the client a bad pass phrase, so that the
-    checksum will fail from the cert.  The client class should both
-    refuse to store the cert, as well as raise an error of some kind.
+    Test client reacting to a bad pass phrase when checking the cert
+    checksum.  Client should both refuse to store the cert as well as
+    call an event.
     """
-    server_dir = tempfile.mkdtemp()
-    client_dir = tempfile.mkdtemp()
     test_port = gen_port()
-
-    class TestClient(SlockyClient):
-        def __init__(self, bad_passphrase):
-            SlockyClient.__init__(self, HOST, test_port, client_dir)
-            self.checksum_failed = False
-            self.bad_passphrase = bad_passphrase
-
-        def on_validate(self):
-            self.validate_device(self.bad_passphrase)
-            
-        def on_checksum_fail(self, pass_phrase):
-            self.checksum_failed = True
-
-
-    class TestServer(SlockyServer, Thread):
-        def __init__(self):
-            SlockyServer.__init__(self, HOST, test_port, server_dir)
-            Thread.__init__(self)
-            self.__stop = False
-
-        def run(self):
-            while not self.__stop:
-                server.process_events()
-                time.sleep(.1)
-            self.shutdown()
-
-        def stop(self):
-            self.__stop = True
-            self.join()
-
-    server = TestServer()
+    server = BasicServer(test_port)
     real_key = server.add_new_device()
     bad_key = "".join([i for i in real_key[::-1]])
-
-    client = TestClient(bad_key)
-
+    client = BasicClient(test_port, bad_key)
     try: 
         server.start()
         client.connect()
+        server.stop()
     except:
         server.stop()
         raise
-    server.stop()
     
-    assert client.checksum_failed == True
+    assert client.called_on_checksum_fail == True
+    assert os.path.isfile(client._certfile) == False
 
 
 def test_bad_pairing():
     """
+    Send bad pairing phrase to server.
+
     In this test, the client should connect to the server, but then
     attempt to pair with an invalid pass phrase.  The server should
-    reply with an error message, and allow the client to try again.
-    (Until the pairing times out, but that is the scope of another
-    test.)
+    reply with an error message, and then close the connection.
+
+    In some higher paranoia state, a pending device pairing should
+    just be canceled.  The rational being is that the client has the
+    ability via the checksum to do "bad password, try again" until
+    they get it right; thus when the client actually sends a request,
+    it is reasonable to assume that if it is not correct the first
+    time, it won't be on subsequent tries (and is probably malicious?)
     """
-    assert False
+
+    test_port = gen_port()
+    server = BasicServer(test_port)
+    real_key = server.add_new_device()
+    bad_key = "".join([i for i in real_key[::-1]])
+    client = BasicClient(test_port, real_key)
+    
+    def gen_device_id():
+        """
+        Request a device_id.
+        """
+        data = {
+            "command" : "req_device_id",
+            "tmp_phrase" : bad_key,
+        }
+        packet = encode(data)
+        client._sock.write(packet)
+
+    client._gen_device_id = gen_device_id
+
+    try: 
+        server.start()
+        client.connect()
+        for i in range(10):
+            client.process_events()
+            time.sleep(.2)
+        server.stop()
+        server.join()
+    except:
+        server.stop()
+        raise
+    
+    assert not client._device_id
 
 
 def test_timeout():
     """
+    Pairing timeout test.
+
     In this test, the client should start performing a device pairing,
     change the timeout value on the server to 0, and fail the device
     pairing.  It should do so for the two phases of the device pairing
@@ -175,6 +203,8 @@ def test_timeout():
 
 def test_reconnection():
     """
+    Client reconnection test.
+    
     This test should connect the client to the server, performing
     pairing etc, and then should disconnect the client, and then
     connect a new client with the same temp directory, send some kind
@@ -185,6 +215,8 @@ def test_reconnection():
 
 def test_communication():
     """
+    Client-server communication test.
+
     This test should connect a client to the server, perform the device
     pairing, send a message, receive a reply, disconnect, reconnect,
     send a message, receive a reply.
@@ -194,6 +226,8 @@ def test_communication():
 
 def test_cold_shoulder():
     """
+    Ignore a malicious client.
+
     A malicious fake client should try to connect to the server without
     performing the device pairing.  The server should ignore all of
     its message requests and deny attempts to authenticate / pair.

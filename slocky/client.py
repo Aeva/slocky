@@ -37,11 +37,11 @@ class SlockyClient(object):
     def __init__(self, host, port, client_dir):
         assert os.path.isdir(client_dir)
         self._certfile = abspath(join(client_dir, "certfile"))
-        self._idfile = abspath(join(client_dir, "device"))
+        self._id_path = abspath(join(client_dir, "device"))
         self._device_id = None
 
-        if os.path.isfile(self._idfile):
-            with open(self._idfile, "r") as id_file:
+        if os.path.isfile(self._id_path):
+            with open(self._id_path, "r") as id_file:
                 self._device_id = id_file.read().strip()
 
         self._host = host
@@ -71,9 +71,8 @@ class SlockyClient(object):
                 # that now before doing anything else
                 self._gen_device_id()
 
-            if self._device_id and not self._connected:
-                self._connected = True
-                self.on_connected()
+            self._connected = True
+            self.on_connected()
             
     def _cert_fetch(self):
         nossl_s = socket.socket()
@@ -147,7 +146,7 @@ class SlockyClient(object):
         Sets and saves the assigned device id.
         """
         self._device_id = device_id
-        with open(self._idfile, "w") as id_file:
+        with open(self._id_path, "w") as id_file:
             id_file.write(str(device_id))
         if not self._connected:
             self._connected = True

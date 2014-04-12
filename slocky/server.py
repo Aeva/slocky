@@ -74,7 +74,7 @@ class SlockyServer(object):
     def __init__(self, host, port, server_dir):
         self._certfile = abspath(joinpath(server_dir, "certfile"))
         self._keyfile = abspath(joinpath(server_dir, "keyfile"))
-        self._ids_file = abspath(joinpath(server_dir, "devices"))
+        self._ids_path = abspath(joinpath(server_dir, "devices"))
 
         self._timeout_period = 60*5 # five minutes
        
@@ -139,8 +139,8 @@ class SlockyServer(object):
         self._clients = []
         self._devices = []
 
-        if os.path.isfile(self._ids_file):
-            with open(self._ids_file, "r") as ids_file:
+        if os.path.isfile(self._ids_path):
+            with open(self._ids_path, "r") as ids_file:
                 self._devices = ids_file.read().strip().split("\n")
 
         self._nossl_s = socket.socket()
@@ -202,7 +202,7 @@ class SlockyServer(object):
         """
         assert device_id is not None
         self._devices.append(device_id)
-        with open(self._ids_file, "a") as id_cache:
+        with open(self._ids_path, "a") as id_cache:
             id_cache.write(str(device_id)+"\n")
         
     def check_message(self, client, packet):
