@@ -39,12 +39,21 @@ class ClientConnection(object):
         self._server = weakref.ref(server)
         self.device_id = None
 
+    def _write(self, packet):
+        """
+        Wraps self.sock.write so as to detect for a broken connection.
+        """
+        try:
+            self.sock.write(packet)
+        except socket.error:
+            self._server().disconnected_client(data)
+
     def assign_device_id(self):
         """
         Assign the client a device id.
         """
         self.device_id = str(uuid.uuid4())
-        self.sock.write(encode({
+        self._write(encode({
             "device_id" : self.device_id,
             "command" : "assign_device_id",
         }))
@@ -72,7 +81,7 @@ class ClientConnection(object):
         Send something to the client.
         """
         packet = encode(data, self.device_id)
-        self.sock.write(packet)
+        self._write(packet)
 
 
 
@@ -214,6 +223,17 @@ class SlockyServer(object):
         with open(self._ids_path, "a") as id_cache:
             id_cache.write(str(device_id)+"\n")
 
+    def disconnected_cat(self, client):
+        """
+        Called when a client's connection closed.
+        """
+        ## FIXME: log this?
+        self._clients.pop(self._clients.index(client))
+        try:
+            client.sock.close()
+        except:
+            pass
+
     def revoke_client(self, client):
         """
         Called when a client attempts to perform a device pairing with an
@@ -225,7 +245,10 @@ class SlockyServer(object):
         
         # FIXME: consider logging when this happens :P
         self._clients.pop(self._clients.index(client))
-        client.sock.close()
+        try:
+            client.sock.close()
+        except:
+            pass
         
     def check_message(self, client, packet):
         """

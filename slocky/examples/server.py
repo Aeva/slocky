@@ -15,13 +15,45 @@
 # along with Slocky.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import time
+import tempfile
 from slocky.server import SlockyServer
 
 
+PORT = 14900
+HOST = 'localhost'
+SERVER_DIR = tempfile.mkdtemp()
 
 
-def test_server():
-    srv = SlockyServer('localhost', 14900, ".")
-    print "New device code: \"{0}\"".format(srv.add_new_device)
-    while True:
-        srv.process_events()
+class ExampleServer(SlockyServer):
+    def __init__(self):
+        SlockyServer.__init__(self, HOST, PORT, SERVER_DIR)
+
+    def loop_forever(self):
+        """
+        Run the server's event loop until the process is killed.
+
+        Generate a new device pairing key and print it to the console
+        whenever there is no pending pairing.
+        """
+        print "Starting server main loop..."
+        while True:
+            if self._pending is None:
+                msg =  " - Use this pass phrase to validate a new device:\n"
+                msg += ' - - "{0}"\n'
+                print msg.format(self.add_new_device())
+            self.process_events()
+            time.sleep(.1)
+
+    def on_message(self, client, data):
+        client.send({
+            "alert" : "The server has received your message.",
+            })
+        for other_client in self._clients:
+            if other_client is not client:
+                other_client.send(data)
+
+
+if __name__ == "__main__":
+    s = ExampleServer()
+    s.loop_forever()
