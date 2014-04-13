@@ -7,6 +7,7 @@
     <property name="border_width">5</property>
     <property name="title" translatable="yes">Slocky Example Chat</property>
     <property name="type_hint">dialog</property>
+    <signal name="close" handler="on_exit" swapped="no"/>
     <child internal-child="vbox">
       <object class="GtkVBox" id="dialog-vbox2">
         <property name="visible">True</property>
@@ -24,6 +25,7 @@
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
+                <signal name="pressed" handler="on_exit" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -58,6 +60,8 @@
             <property name="can_focus">False</property>
             <child>
               <object class="GtkScrolledWindow" id="scrolledwindow1">
+                <property name="width_request">600</property>
+                <property name="height_request">500</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="hscrollbar_policy">never</property>
@@ -91,6 +95,7 @@
             </child>
             <child>
               <object class="GtkEntry" id="entry2">
+                <property name="height_request">80</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="can_default">True</property>
@@ -123,11 +128,13 @@
     </action-widgets>
   </object>
   <object class="GtkDialog" id="connection_prompt">
+    <property name="width_request">350</property>
     <property name="can_focus">False</property>
     <property name="border_width">5</property>
     <property name="title" translatable="yes">Connect to the Chat Server</property>
     <property name="resizable">False</property>
     <property name="type_hint">dialog</property>
+    <signal name="close" handler="on_exit" swapped="no"/>
     <child internal-child="vbox">
       <object class="GtkVBox" id="dialog-vbox3">
         <property name="visible">True</property>
@@ -145,6 +152,7 @@
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
+                <signal name="pressed" handler="on_exit" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -159,6 +167,7 @@
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
+                <signal name="pressed" handler="on_connect_button_pressed" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -287,13 +296,11 @@
     <property name="width_request">200</property>
     <property name="can_focus">False</property>
     <property name="border_width">5</property>
-    <property name="type">popup</property>
     <property name="title" translatable="yes">Enter Pass Phrase</property>
     <property name="resizable">False</property>
     <property name="modal">True</property>
-    <property name="window_position">center-on-parent</property>
-    <property name="destroy_with_parent">True</property>
     <property name="type_hint">dialog</property>
+    <signal name="close" handler="on_exit" swapped="no"/>
     <child internal-child="vbox">
       <object class="GtkVBox" id="dialog-vbox1">
         <property name="visible">True</property>
@@ -311,6 +318,7 @@
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
+                <signal name="pressed" handler="on_exit" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -325,6 +333,7 @@
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
+                <signal name="pressed" handler="on_validate_button_pressed" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -359,7 +368,7 @@
               </packing>
             </child>
             <child>
-              <object class="GtkEntry" id="entry1">
+              <object class="GtkEntry" id="validation_entry">
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="invisible_char">●</property>
