@@ -17,3 +17,5 @@ Contents
    :maxdepth: 1
 
    how_slocky_works
+
+   api/client
