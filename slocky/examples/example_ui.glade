@@ -26,6 +26,7 @@
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
                 <signal name="activate" handler="on_exit" swapped="no"/>
+                <signal name="clicked" handler="on_exit" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -41,6 +42,7 @@
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
                 <signal name="activate" handler="on_post_msg" swapped="no"/>
+                <signal name="clicked" handler="on_post_msg" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -154,6 +156,7 @@
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
                 <signal name="activate" handler="on_exit" swapped="no"/>
+                <signal name="clicked" handler="on_exit" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -169,6 +172,7 @@
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
                 <signal name="activate" handler="on_connect_button_pressed" swapped="no"/>
+                <signal name="clicked" handler="on_connect_button_pressed" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -320,6 +324,7 @@
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
                 <signal name="activate" handler="on_exit" swapped="no"/>
+                <signal name="clicked" handler="on_exit" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -335,6 +340,7 @@
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
                 <signal name="activate" handler="on_validate_button_pressed" swapped="no"/>
+                <signal name="clicked" handler="on_validate_button_pressed" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
