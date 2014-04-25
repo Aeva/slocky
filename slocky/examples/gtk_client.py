@@ -64,7 +64,7 @@ class GladeClient(SlockyClient):
 
             host = host.strip()
             port = int(port.strip())
-            name = name.strip()
+            self.user_name = name.strip()
 
             assert len(host) > 0
             assert len(name) > 0
@@ -141,7 +141,32 @@ class GladeClient(SlockyClient):
         Ideally this event is used to indicate to the frontend that it
         is now safe to attempt to send messages to the server.
         """
-        print "Client can now send and receive to the server."
+        self.show_msg("You are now connected to the server.", "alert")
+
+    def show_msg(self, text, mode, name=None):
+        """
+        Shows a message in the chat log.
+        """
+        assert mode in ["alert", "post", "reply"]
+        textbuf = self.__builder.get_object("chat_text_buffer")
+        end = textbuf.get_end_iter()
+        italics = textbuf.create_tag(style="PANGO_STYLE_ITALIC")
+        purple = textbuf.create_tag(foreground="#8d0196")
+        lime = textbuf.create_tag(foreground="#8dbb00")
+        gray = textbuf.create_tag(foreground="#888888")
+        if mode == "alert":
+            msg = "-->{0}\n".format(text)
+            textbuf.insert_with_tags(end, msg, italics, gray)
+        elif mode == "post":
+            msg = "{0}:".format(self.user_name)
+            textbuf.insert_with_tags(end, msg, lime)
+            end = textbuf.get_end_iter()
+            textbuf.insert(end, " {0}\n".format(text))
+        else:
+            msg = "{0}:".format(name)
+            textbuf.insert_with_tags(end, msg, purple)
+            end = textbuf.get_end_iter()
+            textbuf.insert(end, " {0}\n".format(text))
         
     def on_post_msg(self, *args):
         """
@@ -150,18 +175,37 @@ class GladeClient(SlockyClient):
 
         (See the 'chat_window' gtk widget in the glade file)
         """
-        chat_line = self.__builder.get_object("chat_entry")
-        msg = chat_line.get_text()
-        chat_line.set_text("")
+        textbuf = self.__builder.get_object("entry_text_buffer")
+        start = textbuf.get_start_iter()
+        end = textbuf.get_end_iter()
+        msg = textbuf.get_text(start, end, True)
+        textbuf.set_text("")
         self.send({
             "chat" : msg,
+            "name" : self.user_name,
             })
+        self.show_msg(msg, "post")
 
     def on_message(self, data):
         """
         This event is called when there is a new message from the server.
         """
-        print "NEW MESSAGE: " + str(data)
+        name = "Unknown"
+        mode = "reply"
+        msg = ""
+        if data.has_key("alert"):
+            mode = "alert"
+            msg = data["alert"]
+        elif data.has_key("chat"):
+            msg = data["chat"]
+        if data.has_key("name"):
+            name = data["name"]
+        if msg:
+            if mode == "alert" and \
+               msg == "The server has received your message.":
+                return #don't care
+
+            self.show_msg(msg, mode, name)
         
     def pulse(self, *args):
         """
