@@ -66,7 +66,7 @@ class ClientConnection(object):
         """
         try:
             new_data = self.sock.read()
-        except ssl.SSLError:
+        except ssl.SSLError, socket.error:
             new_data = ""
         if new_data:
             self.pending += new_data
