@@ -186,6 +186,10 @@ class GladeClient(SlockyClient):
             end = textbuf.get_end_iter()
             textbuf.insert(end, " {0}\n".format(text))
 
+        # Scroll to text
+        scrollwindow = self.__builder.get_object("message_body")
+        scrollwindow.scroll_to_iter(end, 0, False, 0.5, 0.5)
+
     def on_post_msg(self, *args):
         """
         This is the event handler for the "add" button, which is used by
