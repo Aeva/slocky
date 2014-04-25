@@ -90,16 +90,25 @@ class GladeClient(SlockyClient):
         else:            
             print "no match"
 
-    def on_checksum_fail(self):
+    def on_checksum_fail(self, *args):
         print "validation failed"
         # fixme: show an error and make the client try again
         #label = self.__builder.get_object("prompt_label")
 
     def on_connected(self):
         print "Client connected!"
-        self.on_exit()
-        pass
-
+        
+    def on_post_msg(self, *args):
+        """
+        Called when the user clicks the 'Add' button in the ui.  If there
+        is a message to post, send it to the server and clear the
+        input box.
+        """
+        chat_line = self.__builder.get_object("chat_entry")
+        msg = chat_line.get_text()
+        chat_line.set_text("")
+        print "Sending chat line:", msg
+        
     def pulse(self):
         """
         Schedule me to occur periodically.
