@@ -122,19 +122,33 @@ class GladeClient(SlockyClient):
     def on_connected(self):
         """
         This is called when the certificate is determined to be valid, and
-        a ssl connection to the
+        a ssl connection has been established.  At this point in time
+        the client can read, but cannot write.
+
+        Calling 'self.process_events()' periodically is necessary to
+        finish the pairing process.  In this example, we accomplish
+        this via self.pulse, which schedules itself as a recurring
+        timeout.
         """
         print "SSL connection established."
-        self.__pulse_timeout = GObject.timeout_add(50, self.pulse, None)
+        self.pulse()
 
     def on_device_verified(self):
+        """
+        This is called after on_connected, as soon as the client has a
+        device_id assigned to it.
+
+        Ideally this event is used to indicate to the frontend that it
+        is now safe to attempt to send messages to the server.
+        """
         print "Client can now send and receive to the server."
         
     def on_post_msg(self, *args):
         """
-        Called when the user clicks the 'Add' button in the ui.  If there
-        is a message to post, send it to the server and clear the
-        input box.
+        This is the event handler for the "add" button, which is used by
+        the user to indicate that their message is to be sent to the server.
+
+        (See the 'chat_window' gtk widget in the glade file)
         """
         chat_line = self.__builder.get_object("chat_entry")
         msg = chat_line.get_text()
@@ -144,11 +158,16 @@ class GladeClient(SlockyClient):
             })
 
     def on_message(self, data):
+        """
+        This event is called when there is a new message from the server.
+        """
         print "NEW MESSAGE: " + str(data)
         
     def pulse(self, *args):
         """
-        Schedule me to occur periodically.
+        This method schedules itself as a reoccuring timeout.  This allows
+        events from the server to be processed.  Without it,
+        on_message, and on_device_verified would never be called.
         """
         self.process_events()
         self.__pulse_timeout = GObject.timeout_add(50, self.pulse, None)
