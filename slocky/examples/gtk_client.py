@@ -53,6 +53,11 @@ class GladeClient(SlockyClient):
         """
         Called when the client closes.
         """
+        try:
+            self.send({"alert": "{0} is signing out.".format(self.user_name)})
+        except Exception:
+            pass # Oh well, the server should announce this too.
+
         Gtk.main_quit()
 
     def on_connect_button_pressed(self, *args):
@@ -145,6 +150,8 @@ class GladeClient(SlockyClient):
         is now safe to attempt to send messages to the server.
         """
         self.show_msg("You are now connected to the server.", "alert")
+        self.send({"alert": "{0} has connected the server.".format(self.user_name)})
+
 
     def on_key_press(self, widget, event):
         # If we hit enter.
