@@ -45,8 +45,8 @@ class ClientConnection(object):
         """
         try:
             self.sock.write(packet)
-        except socket.error:
-            self._server().disconnected_client(data)
+        except socket.error as s_err:
+            self._server().disconnected_client(self)
 
     def assign_device_id(self):
         """
@@ -66,7 +66,9 @@ class ClientConnection(object):
         """
         try:
             new_data = self.sock.read()
-        except ssl.SSLError, socket.error:
+        except ssl.SSLError:
+            new_data = ""
+        except socket.error as sock_err:
             new_data = ""
         if new_data:
             self.pending += new_data
@@ -245,6 +247,7 @@ class SlockyServer(object):
         # socket, blocking the ip address, tec?
         
         # FIXME: consider logging when this happens :P
+        print "WARNING: revoke_client called!"
         self._clients.pop(self._clients.index(client))
         try:
             client.sock.close()
@@ -264,8 +267,9 @@ class SlockyServer(object):
         if data.has_key("command"):
             if data["command"] == "req_device_id" \
                and data.has_key("tmp_phrase"):
-                if data["tmp_phrase"] == self._pending[0]:
-                    if not self._check_pair_expiration(client.sock, client.addr):
+                if self._pending and data["tmp_phrase"] == self._pending[0]:
+                    if not self._check_pair_expiration(
+                            client.sock, client.addr):
                         self._pending = None
                         client.assign_device_id()
                 else:
