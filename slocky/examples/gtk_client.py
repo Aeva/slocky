@@ -20,7 +20,7 @@ import os
 import time
 import tempfile
 
-from gi.repository import Gtk, GObject
+from gi.repository import Gtk, GObject, Notify
 
 from slocky.client import SlockyClient
 
@@ -45,6 +45,9 @@ class GladeClient(SlockyClient):
 
         self.__ct_prompt = self.__builder.get_object("connection_prompt")
         self.__ct_prompt.show_all()
+
+        # Initialize notifications
+        Notify.init("slocky")
 
     def on_exit(self, *args):
         """
@@ -143,6 +146,20 @@ class GladeClient(SlockyClient):
         """
         self.show_msg("You are now connected to the server.", "alert")
 
+    def notify(self, message):
+        """
+        Displays a notification
+        """
+        window = self.__builder.get_object("chat_window")
+
+        # Don't show notification if window is in focus
+        if window.is_active():
+            return False
+
+        notification = Notify.Notification.new("Slocky", message, "dialog-information")
+        notification.show()
+        return True
+
     def show_msg(self, text, mode, name=None):
         """
         Shows a message in the chat log.
@@ -163,11 +180,12 @@ class GladeClient(SlockyClient):
             end = textbuf.get_end_iter()
             textbuf.insert(end, " {0}\n".format(text))
         else:
+            self.notify("You have a new message from {0}.".format(name))
             msg = "{0}:".format(name)
             textbuf.insert_with_tags(end, msg, purple)
             end = textbuf.get_end_iter()
             textbuf.insert(end, " {0}\n".format(text))
-        
+
     def on_post_msg(self, *args):
         """
         This is the event handler for the "add" button, which is used by
