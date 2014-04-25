@@ -20,7 +20,7 @@ import os
 import time
 import tempfile
 
-from gi.repository import Gtk
+from gi.repository import Gtk, GObject
 
 from slocky.client import SlockyClient
 
@@ -96,7 +96,11 @@ class GladeClient(SlockyClient):
         #label = self.__builder.get_object("prompt_label")
 
     def on_connected(self):
-        print "Client connected!"
+        print "SSL connection established."
+        self.__pulse_timeout = GObject.timeout_add(50, self.pulse, None)
+
+    def on_device_verified(self):
+        print "Client can now send and receive to the server."
         
     def on_post_msg(self, *args):
         """
@@ -107,14 +111,19 @@ class GladeClient(SlockyClient):
         chat_line = self.__builder.get_object("chat_entry")
         msg = chat_line.get_text()
         chat_line.set_text("")
-        print "Sending chat line:", msg
+        self.send({
+            "chat" : msg,
+            })
+
+    def on_message(self, data):
+        print "NEW MESSAGE: " + str(data)
         
-    def pulse(self):
+    def pulse(self, *args):
         """
         Schedule me to occur periodically.
         """
-        pass
-
+        self.process_events()
+        self.__pulse_timeout = GObject.timeout_add(50, self.pulse, None)
 
 if __name__ == "__main__":
     client = GladeClient()

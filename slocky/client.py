@@ -61,7 +61,10 @@ class SlockyClient(object):
             # first we need to download and validate the server's
             # certificate
             self._cert_fetch()
-            
+        else:
+            assert self._device_id
+            self.on_checksum_pass()
+                        
     def _cert_fetch(self):
         nossl_s = socket.socket()
         nossl_s.connect((self._host, self._port+1))
@@ -137,9 +140,7 @@ class SlockyClient(object):
         self._device_id = device_id
         with open(self._id_path, "w") as id_file:
             id_file.write(str(device_id))
-        if not self._connected:
-            self._connected = True
-            self.on_connected()
+        self.on_device_verified()
 
     def _process_message(self, packet):
         """
@@ -199,6 +200,9 @@ class SlockyClient(object):
             self._connected = True
             self.on_connected()
 
+            if self._device_id:
+                self.on_device_verified()
+
     def on_checksum_fail(self):
         """
         This is called when a certificate checksum fails.
@@ -221,8 +225,17 @@ class SlockyClient(object):
 
     def on_connected(self):
         """
-        Override me!  This is called when the client is connected to the
-        server and is ready to send and receive commands.
+        Override me!  This is called when the client is connected via ssl
+        and is able to listen to commands from the server.  THE CLIENT
+        IS NOT NECCESARILY ABLE TO SEND AT THIS POINT.
+        """
+        pass
+
+    def on_device_verified(self):
+        """
+        Override me! This is called after the connection is established,
+        and the client has a valid device ID to use for sending
+        communications.  THUS, the client can both send and receive.
         """
         pass
 
