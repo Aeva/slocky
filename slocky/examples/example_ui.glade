@@ -9,6 +9,7 @@
     <property name="title" translatable="yes">Slocky Example Chat</property>
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_exit" swapped="no"/>
+    <signal name="key-press-event" handler="on_key_press" swapped="no"/>
     <child internal-child="vbox">
       <object class="GtkVBox" id="dialog-vbox2">
         <property name="visible">True</property>
@@ -198,7 +199,7 @@
               <object class="GtkLabel" id="label2">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
-                <property name="label" translatable="yes">Label:</property>
+                <property name="label" translatable="yes">Port:</property>
               </object>
               <packing>
                 <property name="top_attach">1</property>

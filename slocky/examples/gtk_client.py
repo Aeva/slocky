@@ -146,14 +146,11 @@ class GladeClient(SlockyClient):
         """
         self.show_msg("You are now connected to the server.", "alert")
 
-        # When we hit enter we want to send a message
-        chat = self.__builder.get_object("chat_window")
-        chat.connect("key_press_event", self.on_key_press)
-
     def on_key_press(self, widget, event):
         # If we hit enter.
         if event.string == "\r":
             self.on_post_msg()
+            return True
 
     def notify(self, message):
         """
