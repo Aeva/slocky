@@ -30,6 +30,11 @@ CLIENT_DIR = tempfile.mkdtemp()
 
 class GladeClient(SlockyClient):
     def __init__(self):
+        """
+        Note that the SlockyClient's base class in this example is
+        initialized by the on_connect_button_pressed method.
+        SlockyClient methods should not be called until then.
+        """
         glade_path = os.path.join(
             os.path.split(__file__)[0],
             "example_ui.glade")
@@ -49,9 +54,9 @@ class GladeClient(SlockyClient):
 
     def on_connect_button_pressed(self, *args):
         """
-        Called when the client attempts to connect.
+        Called when the user has input the server to connect to.
+        (See "connection_propmt" gtk window in the glade file)
         """
-
         try:
             host = self.__builder.get_object("host_entry").get_text()
             port = self.__builder.get_object("port_entry").get_text()
@@ -75,12 +80,22 @@ class GladeClient(SlockyClient):
         self.connect()
 
     def on_validate(self):
+        """
+        This is called when the client has a new SSL cert to validate.
+        This method should be used to prompt the user for the checksum
+        salt.
+        """
         chat = self.__chat = self.__builder.get_object("chat_window")
         vali = self.__vali = self.__builder.get_object("validation_dialog")
         chat.show_all()
         vali.show_all()
         
     def on_validate_button_pressed(self, *args):
+        """
+        Called after the user has input a hash.  Attempts to validate for
+        correctness.  (See "validation_dialog" gtk window in the glade
+        file)
+        """
         vali_entry = self.__builder.get_object("validation_entry")
         passphrase = vali_entry.get_text().strip()
         match = re.match(r"^[a-z]+ [a-z]+ [a-z]+ [a-z]+$", passphrase)
@@ -91,11 +106,24 @@ class GladeClient(SlockyClient):
             print "no match"
 
     def on_checksum_fail(self, *args):
+        """
+        This is called when the certificate checksum fails with the salt
+        provided by the user.  Ideally the user should be notified of
+        this and determine if they want to try to enter the salt in
+        again or give up.
+
+        User should be also informed of the implications of a possible
+        malicious entity.
+        """
         print "validation failed"
         # fixme: show an error and make the client try again
         #label = self.__builder.get_object("prompt_label")
 
     def on_connected(self):
+        """
+        This is called when the certificate is determined to be valid, and
+        a ssl connection to the
+        """
         print "SSL connection established."
         self.__pulse_timeout = GObject.timeout_add(50, self.pulse, None)
 
