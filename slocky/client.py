@@ -61,18 +61,6 @@ class SlockyClient(object):
             # first we need to download and validate the server's
             # certificate
             self._cert_fetch()
-
-        if os.path.isfile(self._certfile):
-            # if we have a valid certificate, open a new connection
-            self._connect()
-
-            if not self._device_id:
-                # if we don't yet have a device id established, do
-                # that now before doing anything else
-                self._gen_device_id()
-
-            self._connected = True
-            self.on_connected()
             
     def _cert_fetch(self):
         nossl_s = socket.socket()
@@ -137,6 +125,7 @@ class SlockyClient(object):
             self._passphrase = passphrase
             with open(self._certfile, "w") as cert_file:
                 cert_file.write(self._cert_data)
+            self.on_checksum_pass()
         else:
             # certificate checksum failed
             self.on_checksum_fail(passphrase)
@@ -192,19 +181,23 @@ class SlockyClient(object):
         packet = encode(data, self._device_id)
         self._sock.write(packet)
 
-    def on_message(self, msg_object):
+    def on_checksum_pass(self):
         """
-        Override me!  This is called when there is a new event from the
-        server.
+        This is called when a certificate checksum passes.  Generally,
+        this function should not need to be overridden.  Override
+        on_connected instead.
         """
-        pass
+        if os.path.isfile(self._certfile):
+            # if we have a valid certificate, open a new connection
+            self._connect()
 
-    def on_connected(self):
-        """
-        Override me!  This is called when the client is connected to the
-        server and is ready to send and receive commands.
-        """
-        pass
+            if not self._device_id:
+                # if we don't yet have a device id established, do
+                # that now before doing anything else
+                self._gen_device_id()
+
+            self._connected = True
+            self.on_connected()
 
     def on_checksum_fail(self):
         """
@@ -216,6 +209,20 @@ class SlockyClient(object):
         """
         Override me!  This is called when the user needs to enter in the
         "device key" passphrase to validate a new certificate.
+        """
+        pass
+
+    def on_message(self, msg_object):
+        """
+        Override me!  This is called when there is a new event from the
+        server.
+        """
+        pass
+
+    def on_connected(self):
+        """
+        Override me!  This is called when the client is connected to the
+        server and is ready to send and receive commands.
         """
         pass
 

@@ -86,7 +86,6 @@ class GladeClient(SlockyClient):
         match = re.match(r"^[a-z]+ [a-z]+ [a-z]+ [a-z]+$", passphrase)
         if match is not None:
             self.__vali.hide()
-            import pdb; pdb.set_trace()
             self.validate_device(passphrase)
         else:            
             print "no match"
@@ -97,7 +96,8 @@ class GladeClient(SlockyClient):
         #label = self.__builder.get_object("prompt_label")
 
     def on_connect(self):
-        print "Client connected"
+        print "Client connected!"
+        import pdb; pdb.set_trace()
         self.on_exit()
         pass
 
