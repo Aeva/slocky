@@ -150,18 +150,19 @@ class SlockyServer(object):
         """
         
         self._s = socket.socket()
+        self._s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._s.bind((host, port))
         self._s.listen(5)
         self._s.setblocking(0)
         self._sockets = []
         self._clients = []
         self._devices = []
-
         if os.path.isfile(self._ids_path):
             with open(self._ids_path, "r") as ids_file:
                 self._devices = ids_file.read().strip().split("\n")
 
         self._nossl_s = socket.socket()
+        self._nossl_s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._nossl_s.bind((host, port+1))
         self._nossl_s.listen(5)
         self._nossl_s.setblocking(0)
