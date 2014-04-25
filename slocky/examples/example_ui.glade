@@ -25,7 +25,7 @@
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
-                <signal name="pressed" handler="on_exit" swapped="no"/>
+                <signal name="activate" handler="on_exit" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -40,6 +40,7 @@
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
+                <signal name="activate" handler="on_post_msg" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -152,7 +153,7 @@
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
-                <signal name="pressed" handler="on_exit" swapped="no"/>
+                <signal name="activate" handler="on_exit" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -167,7 +168,7 @@
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
-                <signal name="pressed" handler="on_connect_button_pressed" swapped="no"/>
+                <signal name="activate" handler="on_connect_button_pressed" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -318,7 +319,7 @@
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
-                <signal name="pressed" handler="on_exit" swapped="no"/>
+                <signal name="activate" handler="on_exit" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
@@ -333,7 +334,7 @@
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
-                <signal name="pressed" handler="on_validate_button_pressed" swapped="no"/>
+                <signal name="activate" handler="on_validate_button_pressed" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>

@@ -95,9 +95,8 @@ class GladeClient(SlockyClient):
         # fixme: show an error and make the client try again
         #label = self.__builder.get_object("prompt_label")
 
-    def on_connect(self):
+    def on_connected(self):
         print "Client connected!"
-        import pdb; pdb.set_trace()
         self.on_exit()
         pass
 
