@@ -6,6 +6,7 @@
   <object class="GtkWindow" id="chat_window">
     <property name="can_focus">False</property>
     <property name="title" translatable="yes">Slocky Chat Client Example</property>
+    <property name="window_position">center</property>
     <signal name="key-press-event" handler="on_key_press" swapped="no"/>
     <signal name="delete-event" handler="on_exit" swapped="no"/>
     <child>
@@ -238,6 +239,7 @@
     <property name="title" translatable="yes">Enter Pass Phrase</property>
     <property name="resizable">False</property>
     <property name="modal">True</property>
+    <property name="window_position">center</property>
     <property name="type_hint">dialog</property>
     <signal name="close" handler="on_exit" swapped="no"/>
     <child internal-child="vbox">
