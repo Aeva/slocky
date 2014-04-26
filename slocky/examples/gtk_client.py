@@ -57,7 +57,7 @@ class GladeClient(SlockyClient):
             self.send({"alert": "{0} is signing out.".format(self.user_name)})
         except Exception:
             pass # Oh well, the server should announce this too.
-
+        self.shutdown()
         Gtk.main_quit()
 
     def on_connect_button_pressed(self, *args):

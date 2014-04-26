@@ -39,6 +39,12 @@ class ClientConnection(object):
         self._server = weakref.ref(server)
         self.device_id = None
 
+    def close(self):
+        """
+        Close the client connection.
+        """
+        self._server().drop_client(self)
+
     def _write(self, packet):
         """
         Wraps self.sock.write so as to detect for a broken connection.
@@ -46,7 +52,7 @@ class ClientConnection(object):
         try:
             self.sock.write(packet)
         except socket.error as s_err:
-            self._server().disconnected_client(self)
+            self.close()
 
     def assign_device_id(self):
         """
@@ -69,7 +75,8 @@ class ClientConnection(object):
         except ssl.SSLError:
             new_data = ""
         except socket.error as sock_err:
-            new_data = ""
+            self.close()
+            return
         except AttributeError:
             print "!!! Suppressed AttributeError of unknown cause."
             print "if you see this msg repeatedly, please comment on"
@@ -163,6 +170,7 @@ class SlockyServer(object):
         self._sockets = []
         self._clients = []
         self._devices = []
+        self._to_disconnect = []
         if os.path.isfile(self._ids_path):
             with open(self._ids_path, "r") as ids_file:
                 self._devices = ids_file.read().strip().split("\n")
@@ -186,24 +194,27 @@ class SlockyServer(object):
             ssl_version = ssl.PROTOCOL_TLSv1)
         client = ClientConnection(self, ssl_wrapper, address)
         self._clients.append(client)
-        return client
+        return client        
 
-    def _check_pair_expiration(self, sock, addr):
+    def _check_pair_expiration(self, sock=None, addr=None):
         """
         Checks to see if a pending device pairing has expired.  Serves an
         error message to the client if it has; returns True if the
         pair expired and False if it is still good.
+        
+        Sock and addr are optional arguments.
         """
 
-        stamp = time.time() - self._pending[1]
-        if stamp > self._timeout_period:
-            # passphrase expired
-            sock.send("ERROR:Device pairing expired.")
-            sock.close()
-            self._pending = None
-            return True
-        else:
-            return False
+        if self._pending:
+            stamp = time.time() - self._pending[1]
+            if stamp > self._timeout_period:
+                # passphrase expired
+                if sock and addr:
+                    sock.send("ERROR:Device pairing expired.")
+                    sock.close()
+                self._pending = None
+                return True
+        return False
 
     def _serve_cert(self, sock, addr):
         """
@@ -230,16 +241,13 @@ class SlockyServer(object):
         with open(self._ids_path, "a") as id_cache:
             id_cache.write(str(device_id)+"\n")
 
-    def disconnected_client(self, client):
+    def drop_client(self, client):
         """
-        Called when a client's connection closed.
+        Called either to clean up a closed client connection or to close a
+        connection with a client.
         """
-        ## FIXME: log this?
-        self._clients.pop(self._clients.index(client))
-        try:
-            client.sock.close()
-        except:
-            pass
+        if not self._to_disconnect.count(client):
+            self._to_disconnect.append(client)
 
     def revoke_client(self, client):
         """
@@ -278,6 +286,9 @@ class SlockyServer(object):
                         client.assign_device_id()
                 else:
                     self.revoke_client(client)
+            elif data["command"] == "shutdown":
+                client.close()
+                return
 
         if device_id and self._devices.count(device_id):
             ignore = False
@@ -289,6 +300,23 @@ class SlockyServer(object):
         """
         Schedule this somewhere, to process incoming events.
         """
+        # expire pairing requests if applicable:
+        self._check_pair_expiration()
+
+        # drop any disconnected clients:
+        disconnected = []
+        for client in self._to_disconnect:
+            # drink to their health and meet with them no more
+            if self._clients.count(client):
+                self._clients.pop(self._clients.index(client))
+                disconnected.append(client)
+            try:
+                client.sock.close()
+            except:
+                pass
+        # trigger the events for the now-disconnected clients:
+        for client in disconnected:
+            self.on_disconnect(client)
 
         # readable, writeable, errored
         read_list = [self._s, self._nossl_s] if self._pending \
@@ -309,6 +337,14 @@ class SlockyServer(object):
         # timely fashion.
         for client in self._clients:
             client.cycle()
+
+    def on_disconnect(self, client):
+        """
+        A particular client has disconnected.  Note, do not try to write
+        to send things to that client - their socket is already closed.
+        """
+        print "client disconnected - " + str(client.addr)
+        pass
         
     def on_message(self, client, data):
         """
@@ -325,7 +361,7 @@ class SlockyServer(object):
         packet = encode(data)
 
         if not clients:
-            clients = self.clients
+            clients = self._clients
 
         for client in clients:
             # may or may not be correct

@@ -243,4 +243,10 @@ class SlockyClient(object):
         """
         Close the client connection.
         """
-        self._sock.close()
+        try:
+            if self._device_id is not None:
+                self.send({"command":"shutdown"})
+            self._sock.close()
+        except:
+            # don't care, we're done here
+            pass
