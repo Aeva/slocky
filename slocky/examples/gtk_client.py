@@ -152,7 +152,6 @@ class GladeClient(SlockyClient):
         self.show_msg("You are now connected to the server.", "alert")
         self.send({"alert": "{0} has connected the server.".format(self.user_name)})
 
-
     def on_key_press(self, widget, event):
         # If we hit enter.
         if event.string == "\r":
