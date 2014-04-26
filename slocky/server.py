@@ -70,6 +70,10 @@ class ClientConnection(object):
             new_data = ""
         except socket.error as sock_err:
             new_data = ""
+        except AttributeError:
+            print "!!! Suppressed AttributeError of unknown cause."
+            print "if you see this msg repeatedly, please comment on"
+            print "https://github.com/Aeva/slocky/issues/10"
         if new_data:
             self.pending += new_data
             packets, remainder = decode(self.pending)
