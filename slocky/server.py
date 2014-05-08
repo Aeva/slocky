@@ -289,6 +289,16 @@ class SlockyServer(object):
             elif data["command"] == "shutdown":
                 client.close()
                 return
+            elif data["command"] == "revalidate":
+                hint = data["device_hint"]
+                for dev_id in self._devices:
+                    if hashlib.sha512(dev_id).hexdigest() == hint:
+                        client.device_id = dev_id
+                        ### FIXME
+                        # refuse if there is an existing connection w/
+                        # that device_id, or close out the old
+                        # connection or something.
+                        break
 
         if device_id and self._devices.count(device_id):
             ignore = False
@@ -369,7 +379,7 @@ class SlockyServer(object):
 
     def add_new_device(self):
         """
-        Generate a pass phrase for passing the cert to a new client.
+        Generate a pass phrase fobr passing the cert to a new client.
         Note, that if there is already a pending pairing, this will
         effectively expire the previous pairing.
         """

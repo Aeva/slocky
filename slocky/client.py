@@ -39,6 +39,8 @@ class SlockyClient(object):
         self._certfile = abspath(join(client_dir, "certfile"))
         self._id_path = abspath(join(client_dir, "device"))
         self._device_id = None
+        # set 'True' to indicate a cached device_id:
+        self._prevalidated = False
 
         if os.path.isfile(self._id_path):
             with open(self._id_path, "r") as id_file:
@@ -63,19 +65,24 @@ class SlockyClient(object):
             self._cert_fetch()
         else:
             assert self._device_id
+            self._prevalidated = True
             self.on_checksum_pass()
                         
     def _cert_fetch(self):
         nossl_s = socket.socket()
         nossl_s.connect((self._host, self._port+1))
+        nossl_s.settimeout(1)
 
         cache = ""
         stream = ""
         
-        while len(cache) == 0 or len(stream) > 0:
-            stream = nossl_s.recv(1024)
-            cache += stream
-        nossl_s.close()
+        try:
+            while len(cache) == 0 or len(stream) > 0:
+                stream = nossl_s.recv(1024)
+                cache += stream
+            nossl_s.close()
+        except socket.timeout:
+            pass
 
         parts = cache[:32].split(":")
         command = parts[0]
@@ -92,8 +99,7 @@ class SlockyClient(object):
             self.on_validate()
             
         else:
-            raise NotImplementedError(
-                "Error handling when the cert req is refused")
+            self.on_no_cert_sent()
 
     def _gen_device_id(self):
         """
@@ -133,6 +139,19 @@ class SlockyClient(object):
             # certificate checksum failed
             self.on_checksum_fail(passphrase)
 
+    def _establish_id(self):
+        """
+        This is called after the client has been paired to the server to
+        remind the server of the client's device_id.
+        """
+        hint = hashlib.sha512(self._device_id).hexdigest()
+        data = {
+            "command" : "revalidate",
+            "device_hint" : hint,
+            }
+        packet = encode(data)
+        self._sock.write(packet)
+
     def _assign_device_id(self, device_id):
         """
         Sets and saves the assigned device id.
@@ -154,6 +173,11 @@ class SlockyClient(object):
         else:
             # FIXME: this should probably fail very loudly because it
             # almost certainly means a man-in-the-middle?
+
+            # ... actually maybe we should be using a checksum
+            # instead, with the device id as salt rather than ever
+            # broadcasting the device id after assignment...
+
             assert packet["id"] == self._device_id
             self.on_message(packet["data"])
             
@@ -188,20 +212,19 @@ class SlockyClient(object):
         this function should not need to be overridden.  Override
         on_connected instead.
         """
-        if os.path.isfile(self._certfile):
-            # if we have a valid certificate, open a new connection
-            self._connect()
+        # if we have a valid certificate, open a new connection
+        self._connect()
 
-            if not self._device_id:
-                # if we don't yet have a device id established, do
-                # that now before doing anything else
-                self._gen_device_id()
+        if not self._device_id:
+            # if we don't yet have a device id established, do
+            # that now before doing anything else
+            self._gen_device_id()
 
-            self._connected = True
-            self.on_connected()
+        if self._prevalidated:
+            self._establish_id()
 
-            if self._device_id:
-                self.on_device_verified()
+        self._connected = True        
+        self.on_connected()
 
     def on_checksum_fail(self):
         """
@@ -215,6 +238,15 @@ class SlockyClient(object):
         "device key" passphrase to validate a new certificate.
         """
         pass
+
+    def on_no_cert_sent(self):
+        """
+        Override me!  This is called when the client attempts to fetch a
+        cert from the server without the server expecting a pairing
+        request.
+        """
+        raise NotImplementedError(
+            "Error handling when the cert req is refused")
 
     def on_message(self, msg_object):
         """

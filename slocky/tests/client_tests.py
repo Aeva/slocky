@@ -56,8 +56,11 @@ class BasicServer(SlockyServer, Thread):
 
 
 class BasicClient(SlockyClient):
-    def __init__(self, test_port, validation_phrase):
-        self.client_dir = tempfile.mkdtemp()
+    def __init__(self, test_port, validation_phrase, cert_dir=None):
+        if not cert_dir:
+            self.client_dir = tempfile.mkdtemp()
+        else:
+            self.client_dir = cert_dir
         SlockyClient.__init__(self, HOST, test_port, self.client_dir)
         self.validation_phrase = validation_phrase
 
@@ -68,7 +71,7 @@ class BasicClient(SlockyClient):
 
     def on_validate(self):
         self.called_on_validate = True
-        self.validate_device(self.validation_phrase)                             
+        self.validate_device(self.validation_phrase)
 
     def on_checksum_fail(self, passphrase):
         self.called_on_checksum_fail = True
@@ -260,7 +263,31 @@ def test_cert_req_refused():
     """
     Client response for when server refuses to serve cert.
     """
-    assert False
+
+    test_port = gen_port()
+    server = BasicServer(test_port)
+    client = BasicClient(test_port, None)
+
+    def cli_on_message(msg_data):
+        client.called_on_message = True
+        print msg_data
+    client.on_message = cli_on_message
+
+    client.no_cert_sent = False
+    def on_no_cert_sent():
+        client.no_cert_sent = True
+    client.on_no_cert_sent = on_no_cert_sent
+
+    server.start()
+    client.connect()
+    for i in range(5):
+        try:
+            client.process_events()
+        except AssertionError:
+            break
+        time.sleep(.1)
+    server.stop()
+    assert client.no_cert_sent
 
 
 def test_reconnection():
@@ -271,6 +298,63 @@ def test_reconnection():
     pairing etc, and then should disconnect the client, and then
     connect a new client with the same temp directory, send some kind
     of message and receive a reply, without having to be paired.
+    """
+    test_port = gen_port()
+    server = BasicServer(test_port)
+    client = BasicClient(test_port, server.add_new_device())
+
+    def srv_on_message(client, data):
+        server.called_on_message = True
+        if data.has_key('command') and data['command'] == "echo":
+            client.send({
+                "command" : "alert",
+                "phrase" : data["phrase"],
+            })
+    server.on_message = srv_on_message
+
+    server.start()
+    client.connect()
+    for i in range(5):
+        client.process_events()
+        time.sleep(.1)
+
+    client.shutdown()
+
+    client = BasicClient(test_port, None, cert_dir=client.client_dir)
+    client.echos = []
+    def cli_on_message(msg_data):
+        client.called_on_message = True
+        if msg_data["command"] == "alert":
+            client.echos.append(msg_data["phrase"])
+    client.on_message = cli_on_message
+
+    client.connect()
+    for i in range(5):
+        client.process_events()
+        if client._device_id:
+            break
+        time.sleep(.2)
+
+    client.send({
+        "command" : "echo",
+        "phrase" : "hello",
+    })
+
+    for i in range(5):
+        client.process_events()
+        time.sleep(.1)
+    client.shutdown()
+    server.stop()
+
+    assert server.called_on_message
+    assert len(client.echos) == 1
+    assert client.echos[0] == "hello"
+
+
+def test_duplicate_device_ids():
+    """
+    Blow up in some way or another when two clients w/ same device id
+    connect with simultaneously.
     """
     assert False
 
