@@ -45,6 +45,13 @@ class ClientConnection(object):
         """
         self._server().drop_client(self)
 
+    def kick(self, reason):
+        self._write(encode({
+            "command" : "kick",
+            "reason" : reason,
+        }, self.device_id))
+        self.close()
+        
     def _write(self, packet):
         """
         Wraps self.sock.write so as to detect for a broken connection.
@@ -293,11 +300,11 @@ class SlockyServer(object):
                 hint = data["device_hint"]
                 for dev_id in self._devices:
                     if hashlib.sha512(dev_id).hexdigest() == hint:
+                        for client in self._clients:
+                            if client.device_id == dev_id:
+                                client.kick(
+                                    "WARNING: Another client logged in with your device id.")
                         client.device_id = dev_id
-                        ### FIXME
-                        # refuse if there is an existing connection w/
-                        # that device_id, or close out the old
-                        # connection or something.
                         break
 
         if device_id and self._devices.count(device_id):

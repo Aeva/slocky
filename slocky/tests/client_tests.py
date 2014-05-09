@@ -356,7 +356,69 @@ def test_duplicate_device_ids():
     Blow up in some way or another when two clients w/ same device id
     connect with simultaneously.
     """
-    assert False
+    test_port = gen_port()
+    server = BasicServer(test_port)
+    client = BasicClient(test_port, server.add_new_device())
+
+    def srv_on_message(client, data):
+        server.called_on_message = True
+        if data.has_key('command') and data['command'] == "echo":
+            client.send({
+                "command" : "alert",
+                "phrase" : data["phrase"],
+            })
+    server.on_message = srv_on_message
+
+    server.start()
+    client.connect()
+    for i in range(5):
+        client.process_events()
+        time.sleep(.1)
+
+    client.shutdown()
+
+    def cli_on_message(msg_data):
+        client.called_on_message = True
+        if msg_data["command"] == "alert":
+            client.echos.append(msg_data["phrase"])
+
+    client_a = BasicClient(test_port, None, cert_dir=client.client_dir)
+    client_a.echos = []
+    client_a.on_message = cli_on_message
+
+    client_b = BasicClient(test_port, None, cert_dir=client.client_dir)
+    client_b.echos = []
+    client_b.on_message = cli_on_message
+    
+    client_a.connect()
+    for i in range(5):
+        client_a.process_events()
+        time.sleep(.1)
+
+    client_b.connect()
+    for i in range(5):
+        client_b.process_events()
+        time.sleep(.1)
+
+    client_a.send({
+        "command" : "echo",
+        "phrase" : "hello",
+    })
+
+    client_b.send({
+        "command" : "echo",
+        "phrase" : "hello",
+    })
+
+    for client in [client_a, client_b] * 5:
+        client.process_events()
+        time.sleep(.1)
+    client_a.shutdown()
+    client_b.shutdown()
+    server.stop()
+
+    assert len(client_a.echos) == 0
+    assert len(client_b.echos) == 1
 
 
 def test_timeout():
